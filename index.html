@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Stock Control - ฟาร์มจูล</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#007aff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ฟาร์มจูล">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/561/561184.png">
+
+<style>
+:root {
+  --system-bg: #e5e5ea;
+  --glass: rgba(255, 255, 255, 0.9);
+  --mac-use: #34c759;   /* เขียวสำหรับใช้วัตถุดิบ */
+  --mac-produce: #007aff; /* น้ำเงินสำหรับผลิตเพิ่ม */
+  --mac-blue: #007aff;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, "SF Pro Display", sans-serif; }
+body { margin: 0; background-color: var(--system-bg); background-image: radial-gradient(circle at 50% 50%, #f2f2f7 0%, #c7c7cc 100%); height: 100vh; overflow: hidden; }
+
+/* Animation สำหรับรหัสผิด */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-10px); }
+  40%, 80% { transform: translateX(10px); }
+}
+.error-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+
+/* Panels */
+.app-container { display: flex; height: 100vh; padding: 25px; gap: 20px; filter: blur(20px); transition: filter 0.5s; position: relative; }
+.app-container.unlocked { filter: blur(0); }
+.panel { background: var(--glass); backdrop-filter: blur(40px); border: 1px solid rgba(255,255,255,0.4); border-radius: 30px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 15px 45px rgba(0,0,0,0.1); }
+.left-panel { width: 45%; padding-top: 65px; }
+.right-panel { width: 55%; }
+
+/* Language & Tabs */
+.lang-bar { position: absolute; top: 25px; left: 40px; z-index: 100; display: flex; gap: 6px; background: rgba(0,0,0,0.08); padding: 5px; border-radius: 14px; }
+.lang-btn { padding: 8px 18px; font-size: 13px; font-weight: 700; border-radius: 10px; cursor: pointer; border: none; background: transparent; }
+.lang-btn.active { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.15); color: var(--mac-blue); }
+
+.tab-group { display: flex; background: rgba(0,0,0,0.06); margin: 15px; border-radius: 15px; padding: 3px; position: relative; }
+.tab-slider { position: absolute; top: 3px; bottom: 3px; width: calc(50% - 3px); background: white; border-radius: 12px; transition: 0.35s cubic-bezier(0.2, 0, 0, 1); }
+.tab { flex: 1; padding: 12px; text-align: center; font-size: 13px; font-weight: 700; cursor: pointer; position: relative; z-index: 2; color: #666; }
+
+/* Grid */
+.item-list { flex: 1; overflow-y: auto; padding: 15px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; align-content: start; }
+.item-card { 
+    position: relative; background: #636366; border-radius: 20px; height: 100px; 
+    overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 4px solid transparent;
+}
+.item-card.active-use { border-color: var(--mac-use); }
+.item-card.active-produce { border-color: var(--mac-produce); }
+.overlay-text { position: relative; z-index: 2; color: white; text-align: center; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,0.8); display: flex; flex-direction: column; }
+
+/* Modals */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(20px); }
+.modal-box { background: white; width: 520px; border-radius: 35px; padding: 30px; max-height: 85vh; overflow-y: auto; }
+input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; margin-top: 8px; }
+
+/* Admin Styling */
+.admin-item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+.sort-btns { display: flex; gap: 4px; margin-right: 15px; }
+.sort-btn { background: #f2f2f7; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+
+/* Keypad */
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #c7c7cc; border-radius: 24px; overflow: hidden; }
+.key { background: white; padding: 22px; text-align: center; font-size: 24px; font-weight: 600; cursor: pointer; }
+.key:active { background: #f2f2f7; }
+.dot { width: 14px; height: 14px; border-radius: 50%; background: rgba(0,0,0,0.1); margin: 0 6px; transition: background 0.2s; }
+.dot.filled { background: #1c1c1e; transform: scale(1.3); }
+</style>
+</head>
+<body>
+
+<div id="mainLockScreen" style="position:fixed; inset:0; z-index:9999; background:rgba(255,255,255,0.2); backdrop-filter:blur(50px); display:flex; flex-direction:column; align-items:center; justify-content:center;">
+    <div id="lockUI" style="width:340px; text-align:center;">
+        <h2 id="txtLockTitle"></h2>
+        <div style="display:flex; justify-content:center; margin:25px 0;" id="userDots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+        <div class="keypad" id="userKeypad"></div>
+    </div>
+</div>
+
+<div class="app-container" id="appBody">
+  <div class="lang-bar">
+    <button class="lang-btn active" id="btn-th" onclick="toggleLang('th')">ไทย</button>
+    <button class="lang-btn" id="btn-en" onclick="toggleLang('en')">EN</button>
+    <button class="lang-btn" id="btn-mm" onclick="toggleLang('mm')">မြန်မာ</button>
+  </div>
+
+  <div class="panel left-panel">
+    <div class="tab-group">
+        <div id="tabSlider" class="tab-slider"></div>
+        <div id="tabUse" class="tab active" onclick="setMode('use')"></div>
+        <div id="tabProduce" class="tab" onclick="setMode('produce')"></div>
+    </div>
+    <div class="item-list" id="itemList"></div>
+    <div style="padding:15px; border-top:1px solid rgba(0,0,0,0.05);"><button id="btnAdmin" style="background:rgba(0,0,0,0.06); border:none; padding:15px; border-radius:15px; width:100%; cursor:pointer; font-weight:700;" onclick="openAdminPin()"></button></div>
+  </div>
+
+  <div class="panel right-panel">
+    <div id="summaryArea" style="flex:1; padding:20px; overflow-y:auto;"></div>
+    <div style="padding: 0 25px 15px;"><button id="btnSubmit" style="color:white; border:none; padding:18px; border-radius:18px; font-weight:700; width:100%; cursor:pointer;" onclick="showFinalReview()"></button></div>
+    <div style="padding: 20px 30px; background: rgba(255,255,255,0.4); border-top:1px solid rgba(0,0,0,0.05);">
+        <div id="displayItem" style="font-size: 20px; font-weight: 800; min-height: 48px; display:flex; align-items:center;"></div>
+        <div id="displayQty" style="font-size: 60px; font-weight: 900;">0</div>
+    </div>
+    <div class="keypad" id="mainKeypad"></div>
+  </div>
+</div>
+
+<script>
+// ... โค้ด Logic ของคุณเดิมทั้งหมด ...
+// (ข้ามมาส่วนท้ายของ Script)
+
+// เพิ่มโค้ดลงทะเบียน Service Worker ที่นี่
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('PWA Service Worker Registered'))
+      .catch(err => console.log('Service Worker Failed', err));
+  });
+}
+
+// โค้ด Keypad และอื่นๆ ของคุณ
+buildKeypad('userKeypad', handleUserPin);
+buildKeypad('adminKeypad', handleAdminPin);
+buildKeypad('mainKeypad', handleMainInput, true);
+updateUIVisuals();
+</script>
+</body>
+</html>
